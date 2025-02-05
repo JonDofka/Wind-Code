@@ -50,6 +50,10 @@ class CSVPlotterApp(QMainWindow):
         self.logger_button.clicked.connect(lambda: self.load_files(file_type="logger"))
         self.layout.addWidget(self.logger_button)
 
+        # Label to display currently loaded file type
+        self.loaded_files_label = QLabel("Loaded Files: None", self)
+        self.layout.addWidget(self.loaded_files_label)
+
     def select_files(self):
         options = QFileDialog.Options()
         files, _ = QFileDialog.getOpenFileNames(self, "Select CSV Files", "", "CSV Files (*.csv);;All Files (*)", options=options)
@@ -92,10 +96,16 @@ class CSVPlotterApp(QMainWindow):
     def load_files(self, file_type, folder_path="Wind_Faults"):
         # Clear the UI and switch to main interface
         for i in reversed(range(self.layout.count())):
-            self.layout.itemAt(i).widget().setParent(None)
+            widget = self.layout.itemAt(i).widget()
+            if widget not in [self.label, self.frt_button, self.logger_button, self.loaded_files_label]:
+                widget.setParent(None)
+
+        # Update the loaded files label
+        self.loaded_files_label.setText(f"Loaded Files: {file_type.capitalize()}")
 
         # Add main UI elements
         self.file_list = QListWidget(self)
+        self.file_list.setFixedHeight(100)  # Set a smaller height for the file list
         self.layout.addWidget(self.file_list)
 
         self.column_label = QLabel('Select Columns to Plot:', self)
