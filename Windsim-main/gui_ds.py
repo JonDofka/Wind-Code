@@ -2,10 +2,11 @@ import os
 import sys
 import pandas as pd
 import matplotlib.pyplot as plt
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QListWidget, QWidget, QLabel, QComboBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QListWidget, QWidget, QLabel
 from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+import mplcursors  # Import the mplcursors library
 
 class PlotWindow(QMainWindow):
     def __init__(self, figure):
@@ -22,6 +23,9 @@ class PlotWindow(QMainWindow):
         # Add the matplotlib canvas to the layout
         self.canvas = FigureCanvas(figure)
         layout.addWidget(self.canvas)
+
+        # Enable mplcursors to show labels when hovering over lines
+        self.cursor = mplcursors.cursor(hover=True)
 
 
 class CSVPlotterApp(QMainWindow):
@@ -66,7 +70,7 @@ class CSVPlotterApp(QMainWindow):
         self.column_list.clear()
         df = pd.read_csv(file_path)
         self.column_list.addItems(df.columns)
-
+    
     def plot_data(self):
         selected_files = [self.file_list.item(i).text() for i in range(self.file_list.count())]
         selected_columns = [item.text() for item in self.column_list.selectedItems()]  # Get selected columns
@@ -78,20 +82,61 @@ class CSVPlotterApp(QMainWindow):
         figure = Figure()
         ax = figure.add_subplot(111)
 
+        # Store the lines and their labels for mplcursors
+        self.lines = []  # Store all line objects
+        self.labels = []  # Store corresponding labels
+
         for file in selected_files:
             df = pd.read_csv(file)
             for column in selected_columns:
                 if column in df.columns:
-                    ax.plot(df[column], label=f'{os.path.basename(file)} - {column}', linewidth=2)
+                    line, = ax.plot(df[column], linewidth=2, alpha=0.7, picker=True, pickradius=5)  # Enable picking
+                    self.lines.append(line)
+                    self.labels.append(f'{os.path.basename(file)} - {column}')
 
         ax.set_xlabel('Index')
         ax.set_ylabel('Value')
         ax.set_title(f'Plot of {", ".join(selected_columns)}')
-        ax.legend()
 
         # Create a new window for the plot
         self.plot_window = PlotWindow(figure)
         self.plot_window.show()
+
+        # QLabel for showing the selected line (legend popup)
+        self.legend_label = QLabel(self.plot_window)
+        self.legend_label.setStyleSheet("font-size: 14px; font-weight: bold; background-color: white; padding: 5px; border: 1px solid black;")
+        self.legend_label.setAlignment(Qt.AlignCenter)
+        self.legend_label.setVisible(False)  # Hide initially
+
+        # Connect mplcursors to show tooltips on hover
+        cursor = mplcursors.cursor(self.lines, hover=True)
+        cursor.connect("add", lambda sel: sel.annotation.set_text(self.labels[self.lines.index(sel.artist)]))
+
+        # Connect the click event to highlight a line and show legend popup
+        figure.canvas.mpl_connect('pick_event', self.on_line_click)
+
+    def on_line_click(self, event):
+        """Highlight the selected line, make others transparent, and show a legend popup."""
+        clicked_line = event.artist  # Get the clicked line
+        selected_label = self.labels[self.lines.index(clicked_line)]  # Get label for clicked line
+
+        for line in self.lines:
+            if line == clicked_line:
+                line.set_alpha(1.0)  # Highlight the selected line
+                line.set_linewidth(3)
+            else:
+                line.set_alpha(0.2)  # Make other lines transparent
+                line.set_linewidth(1)
+
+        # Show and update the legend popup
+        self.legend_label.setText(selected_label)
+        self.legend_label.adjustSize()
+        self.legend_label.move(20, 20)  # Position at the top-left of the window
+        self.legend_label.setVisible(True)
+
+        event.canvas.draw()  # Update the plot
+
+
 
     def load_files(self, file_type, folder_path="Wind_Faults"):
         # Clear the UI and switch to main interface
