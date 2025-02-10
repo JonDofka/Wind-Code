@@ -41,43 +41,92 @@ class CSVPlotterApp(QMainWindow):
         self.setCentralWidget(self.main_widget)
         self.layout = QVBoxLayout(self.main_widget)
 
-        # File selection buttons
+        # File selection dropdown
         self.label = QLabel("Select File Type to Load:", self)
         self.layout.addWidget(self.label)
 
-        self.frt_button = QPushButton("FRT Files", self)
-        self.frt_button.clicked.connect(lambda: self.load_files("frt"))
-        self.layout.addWidget(self.frt_button)
-
-        self.logger_button = QPushButton("Logger Files", self)
-        self.logger_button.clicked.connect(lambda: self.load_files("logger"))
-        self.layout.addWidget(self.logger_button)
-
-        # Buttons for specific file types
-        self.p1_button = QPushButton("1P Files", self)
-        self.p1_button.clicked.connect(lambda: self.load_files("1P"))
-        self.layout.addWidget(self.p1_button)
-
-        self.p2_button = QPushButton("2P Files", self)
-        self.p2_button.clicked.connect(lambda: self.load_files("2P"))
-        self.layout.addWidget(self.p2_button)
-
-        self.p2_earth_button = QPushButton("2P-EARTH Files", self)
-        self.p2_earth_button.clicked.connect(lambda: self.load_files("2P-EARTH"))
-        self.layout.addWidget(self.p2_earth_button)
-
-        self.p3_button = QPushButton("3P Files", self)
-        self.p3_button.clicked.connect(lambda: self.load_files("3P"))
-        self.layout.addWidget(self.p3_button)
+        self.file_type_dropdown = QComboBox(self)
+        self.file_type_dropdown.addItems(["All FRT Files","FRT 1P Files", "FRT 2P Files", "FRT 2P-EARTH Files", "FRT 3P Files", "All Logger Files", "1P Files", "2P Files", "2P-EARTH Files", "3P Files",])
+        self.file_type_dropdown.currentIndexChanged.connect(self.on_file_type_selected)
+        self.layout.addWidget(self.file_type_dropdown)
 
         self.loaded_files_label = QLabel("Loaded Files: None", self)
         self.layout.addWidget(self.loaded_files_label)
 
-    def select_files(self):
-        options = QFileDialog.Options()
-        files, _ = QFileDialog.getOpenFileNames(self, "Select CSV Files", "", "CSV Files (*.csv);;All Files (*)", options=options)
+    def on_file_type_selected(self):
+        file_type_mapping = {
+            "All FRT Files": "frt",
+            "FRT 1P Files": "1PFRT",
+            "FRT 2P Files": "2PFRT",
+            "FRT 2P-EARTH Files": "2P-EARTHFRT",
+            "FRT 3P Files": "3PFRT",
+            "All Logger Files": "logger",
+            "1P Files": "1P",
+            "2P Files": "2P",
+            "2P-EARTH Files": "2P-EARTH",
+            "3P Files": "3P"
+        }
+        selected_file_type = self.file_type_dropdown.currentText()
+        self.load_files(file_type_mapping[selected_file_type])
+
+    def load_files(self, file_type, folder_path="Wind_Faults"):
+        # Clear previous widgets (except the dropdown and label)
+        for i in reversed(range(self.layout.count())):
+            widget = self.layout.itemAt(i).widget()
+            if widget not in [self.label, self.file_type_dropdown, self.loaded_files_label]:
+                widget.setParent(None)
+
+        self.loaded_files_label.setText(f"Loaded Files: {file_type}")
+
+        # Add file list widget
+        self.file_list = QListWidget(self)
+        self.file_list.setFixedHeight(100)
+        self.layout.addWidget(self.file_list)
+
+        # Add column selection label and list
+        self.column_label = QLabel('Select Columns to Plot:', self)
+        self.layout.addWidget(self.column_label)
+
+        self.column_list = QListWidget(self)
+        self.column_list.setSelectionMode(QListWidget.MultiSelection)
+        self.layout.addWidget(self.column_list)
+
+        # Add plot button
+        self.plot_button = QPushButton('Plot', self)
+        self.plot_button.clicked.connect(self.plot_data)
+        self.layout.addWidget(self.plot_button)
+
+        # Check if the folder exists
+        if not os.path.exists(folder_path):
+            print(f"Folder '{folder_path}' not found!")
+            return
+
+        # Filter files based on the selected file type
+        if file_type == "frt":
+            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "_frt" in f and f.endswith(".csv")]
+        elif file_type == "logger":
+            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "_frt" not in f and f.endswith(".csv")]
+        elif file_type == "1P":
+            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "1P" in f and "_frt" not in f and f.endswith(".csv")]
+        elif file_type == "2P":
+            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "2P" in f and "EARTH" not in f and "_frt" not in f and f.endswith(".csv")]
+        elif file_type == "2P-EARTH":
+            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "2P.EARTH" in f and "_frt" not in f and f.endswith(".csv")]
+        elif file_type == "3P":
+            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "3P" in f and "_frt" not in f and f.endswith(".csv")]
+        elif file_type == "1PFRT":
+            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "1P" in f and "_frt" in f and f.endswith(".csv")]
+        elif file_type == "2PFRT":
+            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "2P" in f and "EARTH" in f and "_frt" not in f and f.endswith(".csv")]
+        elif file_type == "2P-EARTHFRT":
+            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "2P.EARTH" in f and "_frt" in f and f.endswith(".csv")]
+        elif file_type == "3PFRT":
+            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "3P" in f and "_frt" in f and f.endswith(".csv")]
+        else:
+            files = []
+
+        # Add filtered files to the file list
         if files:
-            self.file_list.clear()
             self.file_list.addItems(files)
             self.load_columns(files[0])  # Load columns from the first file
 
@@ -135,7 +184,6 @@ class CSVPlotterApp(QMainWindow):
         cursor.connect("add", lambda sel: sel.annotation.set_text(self.labels[self.lines.index(sel.artist)]))
 
     def highlight_selected_line(self):
-        #"""Highlight the selected line from the dropdown menu."""
         selected_index = self.line_dropdown.currentIndex()
         
         if selected_index == -1:
@@ -159,11 +207,8 @@ class CSVPlotterApp(QMainWindow):
         self.legend_label.setVisible(True)
 
         self.plot_window.canvas.draw()  # Update the plot
-  # Update the plot
-
 
     def on_line_click(self, event):
-        #"""Highlight the selected line, make others transparent, and show a legend popup."""
         clicked_line = event.artist  # Get the clicked line
         selected_label = self.labels[self.lines.index(clicked_line)]  # Get label for clicked line
 
@@ -182,55 +227,6 @@ class CSVPlotterApp(QMainWindow):
         self.legend_label.setVisible(True)
 
         event.canvas.draw()  # Update the plot
-
-
-
-    def load_files(self, file_type, folder_path="Wind_Faults"):
-        for i in reversed(range(self.layout.count())):
-            widget = self.layout.itemAt(i).widget()
-            if widget not in [self.label, self.frt_button, self.logger_button, self.loaded_files_label, self.p1_button, self.p2_button, self.p2_earth_button, self.p3_button]:
-                widget.setParent(None)
-
-        self.loaded_files_label.setText(f"Loaded Files: {file_type}")
-
-        self.file_list = QListWidget(self)
-        self.file_list.setFixedHeight(100)
-        self.layout.addWidget(self.file_list)
-
-        self.column_label = QLabel('Select Columns to Plot:', self)
-        self.layout.addWidget(self.column_label)
-
-        self.column_list = QListWidget(self)
-        self.column_list.setSelectionMode(QListWidget.MultiSelection)
-        self.layout.addWidget(self.column_list)
-
-        self.plot_button = QPushButton('Plot', self)
-        self.plot_button.clicked.connect(self.plot_data)
-        self.layout.addWidget(self.plot_button)
-
-        if not os.path.exists(folder_path):
-            print(f"Folder '{folder_path}' not found!")
-            return
-
-        # Filtering files based on type
-        if file_type == "frt":
-            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "_frt" in f and f.endswith(".csv")]
-        elif file_type == "logger":
-            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "_frt" not in f and f.endswith(".csv")]
-        elif file_type == "1P":
-            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "1P" in f and f.endswith(".csv")]
-        elif file_type == "2P":
-            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "2P" in f and "EARTH" not in f and f.endswith(".csv")]
-        elif file_type == "2P-EARTH":
-            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "2P.EARTH" in f and f.endswith(".csv")]
-        elif file_type == "3P":
-            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if "3P" in f and f.endswith(".csv")]
-        else:
-            files = []
-
-        if files:
-            self.file_list.addItems(files)
-            self.load_columns(files[0])
 
 
 if __name__ == '__main__':
