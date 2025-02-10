@@ -53,6 +53,10 @@ class CSVPlotterApp(QMainWindow):
         self.loaded_files_label = QLabel("Loaded Files: None", self)
         self.layout.addWidget(self.loaded_files_label)
 
+        # **Auto-load "All FRT Files" on startup**
+        self.file_type_dropdown.setCurrentText("All FRT Files")  
+        self.on_file_type_selected()
+
     def on_file_type_selected(self):
         file_type_mapping = {
             "All FRT Files": "frt",
